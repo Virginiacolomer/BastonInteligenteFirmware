@@ -25,14 +25,14 @@
 #define USAR_SENSORES      1   // H4
 #define USAR_AVISOS        1   // H4
 #define USAR_BOTON         0   // H3
-#define USAR_PULSERA       0   // H2
+#define USAR_PULSERA       1   // H2
 #define USAR_ENERGIA       0   // H1
 #define USAR_MODEM         0   // H3 (0 = el bastón funciona sin red: útil en banco)
 
-#define DEBUG_SENSORES     1   // CSV por el monitor serie: ms,bajo_cm,alto_cm,motor_pwm,aviso_alto
+#define DEBUG_SENSORES     0   // CSV por el monitor serie: ms,bajo_cm,alto_cm,motor_pwm,aviso_alto
 #define DEBUG_AVISOS       0
 #define DEBUG_PANICO       0
-#define DEBUG_PULSERA      0
+#define DEBUG_PULSERA      1
 #define DEBUG_ENERGIA      0
 #define DEBUG_MODEM        0
 #define DEBUG_COMUNICACION 0

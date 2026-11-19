@@ -14,9 +14,12 @@
 #include "avisos.h"
 #include <initializer_list>
 
-#define PWM_FREQ_HZ  20000   // 20 kHz: fuera del rango audible, el motor no "chilla"
-#define PWM_BITS     8       // 0–255
-#define PWM_CANAL    0       // solo para el core esp32 2.x
+#define PWM_FREQ_HZ       20000   // 20 kHz: fuera del rango audible, el motor no "chilla"
+#define PWM_BITS          8       // 0–255
+#define PWM_CANAL         2       // canal 2 para no chocar con tone() (que usa canal 0 en core 2.x)
+
+#define BUZZER_PASIVO     false   // cambiar a true si el buzzer es pasivo (solo hace "clic" con HIGH)
+#define BUZZER_FREQ_HZ    2000    // frecuencia en Hz cuando BUZZER_PASIVO es true
 
 namespace avisos {
 
@@ -67,6 +70,20 @@ static void escribirMotor(uint8_t valor) {
 #else
   ledcWrite(PWM_CANAL, valor);
 #endif
+}
+
+static bool buzzerEncendido = false;
+
+static void escribirBuzzer(bool encender) {
+  if (encender == buzzerEncendido) return;  // evita reiniciar tone() en cada vuelta del loop
+  buzzerEncendido = encender;
+
+  if (BUZZER_PASIVO) {
+    if (encender) tone(PIN_BUZZER, BUZZER_FREQ_HZ);
+    else          noTone(PIN_BUZZER);
+  } else {
+    digitalWrite(PIN_BUZZER, encender ? HIGH : LOW);
+  }
 }
 
 // Devuelve true si el patrón está encendido en el instante t (ms desde su inicio).
@@ -134,7 +151,7 @@ void silenciarTodo() {
   activos = 0;
   unaVez = PATRON_NINGUNO;
   pwmObstaculo = 0;
-  digitalWrite(PIN_BUZZER, LOW);
+  escribirBuzzer(false);
   escribirMotor(0);
 }
 
@@ -146,7 +163,8 @@ void actualizar() {
     bool on;
     if (sonando(p, on)) { buzzer = on; elegido = p; break; }
   }
-  digitalWrite(PIN_BUZZER, buzzer ? HIGH : LOW);
+  escribirBuzzer(buzzer);
+  
 
   // 2. Motor: patrones con vibración propia, si no la de obstáculo bajo
   uint8_t motor = pwmObstaculo;
