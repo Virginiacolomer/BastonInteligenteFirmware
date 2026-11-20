@@ -1,0 +1,86 @@
+CAMBIO EN LOS AVISOS DE OBSTÁCULOS (CU01 / CU02)
+================================================
+Fecha: 20/11/2026
+Firmware: baston/ (versión 0.1.0)
+
+ATENCIÓN: este cambio se aparta del patrón de avisos del documento del proyecto
+(cap. 8, contrato fijo). Se subió directo a main: hay que revisarlo con el grupo.
+
+
+1. QUÉ CAMBIA
+-------------
+ANTES (según el documento):
+  - Sensor bajo:  vibración proporcional cuando el obstáculo está a menos de 150 cm.
+  - Sensor alto:  pitido 120 ms cada 400 ms cuando el obstáculo está a menos de 100 cm.
+  - Los dos avisos eran independientes: podían sonar y vibrar a la vez.
+
+AHORA:
+  Se toma la distancia MÁS CERCANA de los dos sensores (bajo y alto) y se avisa
+  según el tramo en que esté:
+
+    Distancia                  Aviso
+    -------------------------  ---------------------------------------------
+    menos de 50 cm             Buzzer continuo
+    de 50 cm a 1 m             Pitido intermitente (120 ms cada 400 ms)
+    de 1 m a 1,5 m             Vibración del motor, más fuerte cuanto más
+                               cerca (suave a 1,5 m, al máximo a 1 m)
+    más de 1,5 m               Nada
+
+  - En cada tramo hay un solo aviso: por debajo de 1 m el motor NO vibra, solo
+    suena el buzzer.
+  - El límite de 1,5 m es el ajuste "dist_bajo_cm" que ya existía (se cambia de
+    50 a 200 cm desde la app). Si se pone en 1 m o menos, el tramo de vibración
+    desaparece.
+  - El ajuste "dist_alto_cm" queda en la API pero ya NO se usa.
+
+
+2. SIN PARPADEOS (HISTÉRESIS)
+-----------------------------
+Al acercarse, el aviso cambia de tramo enseguida. Al alejarse, recién cambia
+cuando el objeto pasa 8 cm más allá del borde (por ejemplo, el buzzer continuo
+sigue hasta 58 cm, el pitido hasta 108 cm y la vibración hasta 158 cm). Así el
+aviso no se prende y se apaga cuando el objeto está justo en un límite.
+
+
+3. ARCHIVOS MODIFICADOS
+-----------------------
+  baston/config.h
+    - Nuevos: DIST_CERCA_CM = 50 y DIST_MEDIO_CM = 100.
+    - Se quitó KP_MOTOR (la intensidad ahora va de PWM_MOTOR_MIN = 90 en el
+      límite a PWM_MOTOR_MAX = 255 a 1 m).
+    - DIST_AVISO_ALTO_CM queda marcado como "no se usa".
+
+  baston/avisos.h / avisos.cpp
+    - Nuevo patrón PATRON_OBSTACULO_CERCA (buzzer continuo).
+    - PATRON_OBSTACULO_ALTO pasa a llamarse PATRON_OBSTACULO_MEDIO (mismo
+      pitido de 120 ms cada 400 ms).
+    - Prioridad del buzzer: los dos de obstáculo quedan en el mismo lugar que
+      antes (debajo de pánico, pulsera y "sonar el bastón"; arriba de batería).
+
+  baston/obstaculos.h / obstaculos.cpp
+    - Nueva lógica de los tres tramos.
+    - La salida de depuración (DEBUG_SENSORES) ahora es:
+        ms,bajo_cm,alto_cm,motor_pwm,zona
+      con zona: 0 = menos de 50 cm, 1 = 50 cm a 1 m, 2 = vibración, 3 = nada.
+
+
+4. CÓMO PROBARLO
+----------------
+  1. Verificar en config.h que USAR_SENSORES esté en 1 y, si se quiere ver
+     la salida por el monitor serie, DEBUG_SENSORES en 1.
+  2. Acercar un objeto desde más de 2 m:
+       - a 1,5 m empieza a vibrar suave y aumenta hasta 1 m;
+       - entre 1 m y 50 cm deja de vibrar y pita;
+       - por debajo de 50 cm el buzzer suena de forma continua.
+  3. Alejarlo y verificar que los cambios se dan unos 8 cm más lejos.
+
+  El código no se pudo compilar en esta PC: compilar en el Arduino IDE antes
+  de cargarlo.
+
+
+5. A DECIDIR CON EL GRUPO
+-------------------------
+  - Si se acepta el cambio, actualizar el cap. 8 del documento del proyecto.
+  - Si por debajo de 1 m también tiene que vibrar el motor (además del buzzer).
+  - Qué hacer con el ajuste "dist_alto_cm", que quedó sin uso (avisar a S1 y S2,
+    que manejan el backend y la app).

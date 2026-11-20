@@ -29,7 +29,7 @@
 #define USAR_ENERGIA       0   // H1
 #define USAR_MODEM         0   // H3 (0 = el bastón funciona sin red: útil en banco)
 
-#define DEBUG_SENSORES     0   // CSV por el monitor serie: ms,bajo_cm,alto_cm,motor_pwm,aviso_alto
+#define DEBUG_SENSORES     0   // CSV por el monitor serie: ms,bajo_cm,alto_cm,motor_pwm,zona
 #define DEBUG_AVISOS       0
 #define DEBUG_PANICO       0
 #define DEBUG_PULSERA      1
@@ -69,14 +69,19 @@
 // ---------------------------------------------------------------------------
 // 4. VALORES POR DEFECTO
 // ---------------------------------------------------------------------------
-// CU01 · obstáculo bajo
-#define DIST_AVISO_BAJO_CM       150   // ajustable (CU12): 50–200
-#define HISTERESIS_CM              8   // sigue avisando hasta 158 cm
-#define KP_MOTOR                 1.1f  // u = KP·(dist_aviso − d)
-#define PWM_MOTOR_MIN             90
-#define PWM_MOTOR_MAX            255
+// CU01/CU02 · obstáculos: se usa la distancia MÁS CERCANA de los dos sensores
+//   d < DIST_CERCA_CM ..................... buzzer continuo
+//   DIST_CERCA_CM ≤ d < DIST_MEDIO_CM ..... pitido intermitente
+//   DIST_MEDIO_CM ≤ d < DIST_AVISO_BAJO_CM  vibración proporcional
+//   d ≥ DIST_AVISO_BAJO_CM ................ sin aviso
+#define DIST_CERCA_CM             50
+#define DIST_MEDIO_CM            100
+#define DIST_AVISO_BAJO_CM       150   // ajustable (CU12): 50–200 · límite de la vibración
+#define HISTERESIS_CM              8   // para pasar a un tramo más lejano hay que superar el límite + 8 cm
+#define PWM_MOTOR_MIN             90   // en el límite de aviso
+#define PWM_MOTOR_MAX            255   // a DIST_MEDIO_CM
 // CU02 · obstáculo alto
-#define DIST_AVISO_ALTO_CM       100   // ajustable (CU12): 50–150
+#define DIST_AVISO_ALTO_CM       100   // ajustable (CU12): 50–150 · hoy NO se usa (ver tramos arriba)
 // Medición
 #define PERIODO_MEDICION_MS       30   // alterna bajo/alto cada 30 ms
 #define TIMEOUT_ECO_US         25000   // sin eco → 400 cm (sin obstáculo)

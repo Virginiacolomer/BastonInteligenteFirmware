@@ -6,7 +6,7 @@
  *   - De una vez (repite = false): suenan una vez desde reproducir() y terminan.
  * El buzzer reproduce SOLO el patrón de mayor prioridad que esté sonando.
  * El motor vibra con SONAR_BASTON / PANICO_ENVIADO si están; si no, con la
- * intensidad de obstáculo bajo (CU01).
+ * intensidad de obstáculo (tramo de 1 m al límite de aviso).
  * Buzzer ACTIVO: alcanza con HIGH/LOW (no necesita tono). Si su buzzer es
  * pasivo (no suena con HIGH fijo), cambiar BUZZER_ON por tone(PIN_BUZZER, 2700).
  * ========================================================================== */
@@ -27,7 +27,8 @@ struct Paso { uint16_t on, off; };
 struct Def  { const Paso *pasos; uint8_t n; bool repite; bool motor; };
 
 // --- Patrones del cap. 8 ---
-static const Paso P_ALTO[]        = {{120, 280}};                          // cada 400 ms
+static const Paso P_MEDIO[]       = {{120, 280}};                          // cada 400 ms
+static const Paso P_CERCA[]       = {{1000, 0}};                           // continuo (sin silencio)
 static const Paso P_CUENTA[]      = {{80, 920}};                           // 1 por segundo
 static const Paso P_ENVIADO[]     = {{1000, 0}};                           // largo 1 s
 static const Paso P_CONFIRMADO[]  = {{100, 100}, {100, 0}};                // 2 cortos
@@ -38,7 +39,8 @@ static const Paso P_BATERIA[]     = {{600, 300}, {600, 0}};                // 2 
 
 static const Def DEF[] = {
   /* NINGUNO           */ {nullptr, 0, false, false},
-  /* OBSTACULO_ALTO    */ {P_ALTO, 1, true, false},
+  /* OBSTACULO_MEDIO   */ {P_MEDIO, 1, true, false},
+  /* OBSTACULO_CERCA   */ {P_CERCA, 1, true, false},
   /* CUENTA_PANICO     */ {P_CUENTA, 1, true, false},
   /* PANICO_ENVIADO    */ {P_ENVIADO, 1, false, true},
   /* PANICO_CONFIRMADO */ {P_CONFIRMADO, 2, false, false},
@@ -52,12 +54,13 @@ static const Def DEF[] = {
 static const Patron PRIORIDAD[] = {
   PATRON_PANICO_ENVIADO, PATRON_ENVIO_FALLIDO, PATRON_PANICO_CONFIRMADO,
   PATRON_CUENTA_PANICO, PATRON_PULSERA_SUELTA, PATRON_SONAR_BASTON,
-  PATRON_OBSTACULO_ALTO, PATRON_BATERIA_BAJA
+  PATRON_OBSTACULO_CERCA, PATRON_OBSTACULO_MEDIO, PATRON_BATERIA_BAJA
 };
+static_assert(sizeof(DEF) / sizeof(DEF[0]) == PATRON_CANTIDAD, "DEF tiene que tener una fila por patrón, en el orden del enum");
 
 static uint8_t  pwmObstaculo = 0;
 static uint16_t activos = 0;                 // un bit por patrón continuo
-static uint32_t inicioContinuo[9] = {0};
+static uint32_t inicioContinuo[PATRON_CANTIDAD] = {0};
 static Patron   unaVez = PATRON_NINGUNO;
 static uint32_t inicioUnaVez = 0;
 #if DEBUG_AVISOS

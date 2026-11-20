@@ -1,10 +1,16 @@
 /* =============================================================================
  * obstaculos.cpp — Implementación · Dueño: H4 · CU01, CU02 · ver obstaculos.h
  * -----------------------------------------------------------------------------
- * CU01 (bajo):  aviso ON si d < límite; OFF recién si d > límite + HISTERESIS_CM
- *               intensidad: u = PWM_MOTOR_MIN + KP_MOTOR·(límite − d), tope 255
- *               (con límite 150 y KP 1,1: 90 a 150 cm → 255 pegado al objeto)
- * CU02 (alto):  pitido mientras d < límite alto (con 5 cm de histéresis)
+ * d = la MENOR distancia de los dos sensores (bajo y alto). Tramos:
+ *   CERCA  d < 50 cm .............. buzzer continuo   (PATRON_OBSTACULO_CERCA)
+ *   MEDIO  50 cm ≤ d < 1 m ........ pitido 120/400 ms (PATRON_OBSTACULO_MEDIO)
+ *   VIBRA  1 m ≤ d < límite ....... motor proporcional: PWM_MOTOR_MIN en el
+ *                                   límite → PWM_MOTOR_MAX a 1 m
+ *   NADA   d ≥ límite ............. sin aviso
+ * límite = ajustes::distAvisoBajo() (150 cm por defecto, 50–200 desde la app;
+ * si es ≤ 100 cm el tramo de vibración desaparece).
+ * Histéresis: a un tramo más CERCANO se pasa enseguida; a uno más LEJANO recién
+ * cuando d supera el borde del tramo actual + HISTERESIS_CM (evita que titile).
  * ========================================================================== */
 #include "config.h"
 #include "obstaculos.h"
@@ -13,46 +19,75 @@
 #include "ajustes.h"
 #include "estado.h"
 
-#define HISTERESIS_ALTO_CM 5
-
 namespace obstaculos {
 
-static bool    avisoBajoActivo = false;
-static bool    avisoAltoActivo = false;
+enum Zona : uint8_t { ZONA_CERCA, ZONA_MEDIO, ZONA_VIBRA, ZONA_NADA };
+
+static Zona    zona = ZONA_NADA;
 static uint8_t pwmActual = 0;
 #if DEBUG_SENSORES
 static uint32_t ultimoDebugMs = 0;
 #endif
 
+static Zona zonaDe(uint16_t d, uint16_t limite) {
+  if (d < DIST_CERCA_CM) return ZONA_CERCA;
+  if (d < DIST_MEDIO_CM) return ZONA_MEDIO;
+  if (d < limite)        return ZONA_VIBRA;
+  return ZONA_NADA;
+}
+
+// Borde lejano del tramo z (a partir de ahí, + histéresis, se sale del tramo).
+static uint16_t bordeLejano(Zona z, uint16_t limite) {
+  switch (z) {
+    case ZONA_CERCA: return DIST_CERCA_CM;
+    case ZONA_MEDIO: return DIST_MEDIO_CM;
+    default:         return limite;
+  }
+}
+
+static Patron patronDe(Zona z) {
+  if (z == ZONA_CERCA) return PATRON_OBSTACULO_CERCA;
+  if (z == ZONA_MEDIO) return PATRON_OBSTACULO_MEDIO;
+  return PATRON_NINGUNO;
+}
+
 void iniciar() {
 #if DEBUG_SENSORES
-  Serial.println("ms,bajo_cm,alto_cm,motor_pwm,aviso_alto");
+  Serial.println("ms,bajo_cm,alto_cm,motor_pwm,zona");   // zona: 0 cerca, 1 medio, 2 vibra, 3 nada
 #endif
 }
 
 void actualizar() {
   uint16_t dBajo = sensores::distanciaBajo();
   uint16_t dAlto = sensores::distanciaAlto();
+  uint16_t d = dBajo < dAlto ? dBajo : dAlto;
+  uint16_t limite = ajustes::distAvisoBajo();
 
-  // --- CU01 · obstáculo bajo, con histéresis ---
-  uint16_t limBajo = ajustes::distAvisoBajo();
-  if (!avisoBajoActivo && dBajo < limBajo) avisoBajoActivo = true;
-  else if (avisoBajoActivo && dBajo > limBajo + HISTERESIS_CM) avisoBajoActivo = false;
+  // --- Tramo, con histéresis solo al alejarse ---
+  Zona nueva = zonaDe(d, limite);
+  Zona anterior = zona;
+  if (nueva < zona) zona = nueva;
+  else if (nueva > zona && d > bordeLejano(zona, limite) + HISTERESIS_CM) zona = nueva;
 
+  // --- Buzzer: cambia el patrón solo cuando cambia el tramo ---
+  if (zona != anterior) {
+    Patron viejo = patronDe(anterior), actual = patronDe(zona);
+    if (viejo  != PATRON_NINGUNO) avisos::desactivar(viejo);
+    if (actual != PATRON_NINGUNO) avisos::activar(actual);
+  }
+
+  // --- Motor: proporcional solo en el tramo de vibración ---
   pwmActual = 0;
-  if (avisoBajoActivo) {
-    float extra = KP_MOTOR * (float)((int)limBajo - (int)dBajo);
-    if (extra < 0) extra = 0;                         // zona de histéresis: intensidad mínima
-    int u = PWM_MOTOR_MIN + (int)extra;
+  if (zona == ZONA_VIBRA && limite > DIST_MEDIO_CM) {
+    int u = PWM_MOTOR_MIN;
+    if (d < limite) {   // d ≥ límite = zona de histéresis: intensidad mínima
+      int dd = d < DIST_MEDIO_CM ? DIST_MEDIO_CM : d;
+      u += (PWM_MOTOR_MAX - PWM_MOTOR_MIN) * (int)(limite - dd) / (int)(limite - DIST_MEDIO_CM);
+    }
     if (u > PWM_MOTOR_MAX) u = PWM_MOTOR_MAX;
     pwmActual = (uint8_t)u;
   }
   avisos::vibrarObstaculo(pwmActual);
-
-  // --- CU02 · obstáculo alto ---
-  uint16_t limAlto = ajustes::distAvisoAlto();
-  if (!avisoAltoActivo && dAlto < limAlto) { avisoAltoActivo = true; avisos::activar(PATRON_OBSTACULO_ALTO); }
-  else if (avisoAltoActivo && dAlto > limAlto + HISTERESIS_ALTO_CM) { avisoAltoActivo = false; avisos::desactivar(PATRON_OBSTACULO_ALTO); }
 
   { BloqueoEstado b; estado.distBajo = dBajo; estado.distAlto = dAlto; }
 
@@ -60,7 +95,7 @@ void actualizar() {
   // CSV 10 veces por segundo: copiar del monitor serie a una planilla para la prueba de cobertura.
   if (millis() - ultimoDebugMs >= 100) {
     ultimoDebugMs = millis();
-    Serial.printf("%lu,%u,%u,%u,%u\n", (unsigned long)millis(), dBajo, dAlto, pwmActual, avisoAltoActivo ? 1 : 0);
+    Serial.printf("%lu,%u,%u,%u,%u\n", (unsigned long)millis(), dBajo, dAlto, pwmActual, (unsigned)zona);
   }
 #endif
 }
