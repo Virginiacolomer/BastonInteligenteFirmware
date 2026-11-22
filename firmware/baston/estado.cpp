@@ -15,7 +15,7 @@ void iniciarEstado() {
   colaEventos = xQueueCreate(10, sizeof(Evento));   // hasta 10 eventos sin enviar
 }
 
-bool publicarEvento(TipoEvento tipo, uint16_t dato) {
+bool publicarEvento(TipoEvento tipo, uint32_t dato) {
   Evento e{tipo, ajustes::siguienteIdLocal(), millis(), dato};
   // No bloquea: si la cola está llena, se pierde el evento (y se avisa por serie).
   bool ok = xQueueSend(colaEventos, &e, 0) == pdTRUE;

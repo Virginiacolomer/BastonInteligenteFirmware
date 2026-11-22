@@ -16,7 +16,7 @@
  *   bateriaPct/mV/cargando .... bateria      (núcleo 1)
  *   gps* ...................... comunicacion (núcleo 0)
  *   senalCsq, conectado ....... comunicacion (núcleo 0)
- *   sonarPendiente ............ comunicacion → lo consume comandos
+ *   sonarPendiente/idComandoSonar/duracionSonarS ... comunicacion → lo consume comandos
  *
  * Cómo se usa (SIEMPRE con el bloqueo, y bloques cortos):
  *   { BloqueoEstado b; estado.distBajo = d; }          // escribir
@@ -46,9 +46,10 @@ struct Estado {
   // Red (CU08)
   bool     conectado = false;
   int8_t   senalCsq  = 99;    // 0–31; 99 = sin señal
-  // Comandos recibidos (CU10)
+  // Comandos recibidos (CU10): los escribe comunicacion, los consume comandos
   bool     sonarPendiente = false;
-  uint16_t idComandoSonar = 0;
+  uint32_t idComandoSonar = 0;
+  uint16_t duracionSonarS = DURACION_SONAR_S;   // "duracion_s" del comando
 };
 
 // Tipos de evento que van a POST /api/v1/eventos (cap. 7)
@@ -63,14 +64,14 @@ struct Evento {
   TipoEvento tipo;
   uint32_t   idLocal;     // único por dispositivo: hace idempotente el reintento (CU05 2a)
   uint32_t   ms;          // millis() en que ocurrió
-  uint16_t   dato;        // extra: % de batería, id de comando, etc.
+  uint32_t   dato;        // extra: % de batería, id de comando (ack), etc.
 };
 
 extern Estado        estado;
 extern QueueHandle_t colaEventos;
 
 void iniciarEstado();                       // crea el mutex y la cola (lo llama setup)
-bool publicarEvento(TipoEvento tipo, uint16_t dato = 0);  // desde cualquier módulo del núcleo 1
+bool publicarEvento(TipoEvento tipo, uint32_t dato = 0);  // desde cualquier módulo del núcleo 1
 
 // Bloqueo del estado: se toma al crearse y se suelta al salir del bloque { }.
 class BloqueoEstado {

@@ -29,7 +29,6 @@ bool aplicar(const ValoresAjustes &v) {
 uint16_t version()             { return actual.version; }
 uint32_t tiempoPanicoMs()      { return actual.panicoS * 1000UL; }
 uint16_t distAvisoBajo()       { return actual.distBajoCm; }
-uint16_t distAvisoAlto()       { return actual.distAltoCm; }
 uint32_t periodoTelemetriaMs() { return actual.telemetriaS * 1000UL; }
 bool     modoCasa()            { return actual.modoCasa; }
 

@@ -1,5 +1,6 @@
 /* =============================================================================
  * obstaculos.cpp — Implementación · Dueño: H4 · CU01, CU02 · ver obstaculos.h
+ * Coincide con el cap. 8 del documento unificado (rev. D).
  * -----------------------------------------------------------------------------
  * d = la MENOR distancia de los dos sensores (bajo y alto). Tramos:
  *   CERCA  d < 50 cm .............. buzzer continuo   (PATRON_OBSTACULO_CERCA)
@@ -18,6 +19,7 @@
 #include "avisos.h"
 #include "ajustes.h"
 #include "estado.h"
+#include "consola.h"
 
 namespace obstaculos {
 
@@ -27,6 +29,8 @@ static Zona    zona = ZONA_NADA;
 static uint8_t pwmActual = 0;
 #if DEBUG_SENSORES
 static uint32_t ultimoDebugMs = 0;
+static bool     debugPausado = false;
+static bool     avisoBajo = true, avisoAlto = true;   // último estado informado de cada sensor
 #endif
 
 static Zona zonaDe(uint16_t d, uint16_t limite) {
@@ -92,8 +96,17 @@ void actualizar() {
   { BloqueoEstado b; estado.distBajo = dBajo; estado.distAlto = dAlto; }
 
 #if DEBUG_SENSORES
-  // CSV 10 veces por segundo: copiar del monitor serie a una planilla para la prueba de cobertura.
-  if (millis() - ultimoDebugMs >= 100) {
+  // La letra 's' en el monitor serie pausa y reanuda el CSV.
+  if (consola::tecla('s')) {
+    debugPausado = !debugPausado;
+    Serial.println(debugPausado ? "# CSV en pausa ('s' para seguir)" : "ms,bajo_cm,alto_cm,motor_pwm,zona");
+  }
+  // CU01 1a: avisa una vez cuando un sensor deja de responder o vuelve.
+  bool rb = sensores::respondeBajo(), ra = sensores::respondeAlto();
+  if (rb != avisoBajo) { avisoBajo = rb; Serial.println(rb ? "# sensor BAJO responde de nuevo" : "# sensor BAJO no responde: revisar cable (IO16/IO17)"); }
+  if (ra != avisoAlto) { avisoAlto = ra; Serial.println(ra ? "# sensor ALTO responde de nuevo" : "# sensor ALTO no responde: revisar cable (IO18/IO8)"); }
+  // CSV 10 veces por segundo: copiar del monitor serie a una planilla (P1–P4).
+  if (!debugPausado && millis() - ultimoDebugMs >= 100) {
     ultimoDebugMs = millis();
     Serial.printf("%lu,%u,%u,%u,%u\n", (unsigned long)millis(), dBajo, dAlto, pwmActual, (unsigned)zona);
   }

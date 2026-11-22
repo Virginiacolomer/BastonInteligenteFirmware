@@ -40,6 +40,7 @@ firmware/
     ├── boton.h / .cpp      ← pulsador antipánico (lectura pura)
     ├── energia.h / .cpp    ← PMU AXP2101, batería
     ├── modem.h / .cpp      ← SIM7080G: red, GNSS, HTTPS
+    ├── consola.h / .cpp    ← teclas de prueba del monitor serie (s: pausa CSV · b: simula «sonar»)
     │
     │   CAPA DE FUNCIONES (casos de uso)
     ├── obstaculos.h / .cpp ← CU01, CU02
@@ -58,8 +59,8 @@ Los módulos de función **no se llaman entre sí**: se comunican por `estado` y
 
 | CU | Caso de uso | Archivos | HU | Dueño fase 1 | Paquete fase 2 |
 |----|-------------|----------|----|--------------|----------------|
-| CU01 | Avisar obstáculo bajo | `obstaculos`, `sensores`, `avisos` | HU01 | H4 | I1 |
-| CU02 | Avisar obstáculo alto | `obstaculos`, `sensores`, `avisos` | HU02 | H4 | I1 |
+| CU01 | Detectar obstáculos | `obstaculos`, `sensores`, `avisos` | HU01 | H4 | I1 |
+| CU02 | Avisar según la distancia | `obstaculos`, `sensores`, `avisos` | HU02 | H4 | I1 |
 | CU03 | Activar alerta de pánico | `panico`, `boton`, `avisos` → `comunicacion` | HU03 | H3 | I2 |
 | CU04 | Notificar a contactos | *(backend, no firmware)* | HU04 | S3 | I3 |
 | CU05 | Registrar alerta | `comunicacion` (POST /eventos) | HU03 | H3 | I2 |
@@ -67,7 +68,7 @@ Los módulos de función **no se llaman entre sí**: se comunican por `estado` y
 | CU07 | Gestionar contactos | *(app + backend)* | HU09 | S2 | I7 |
 | CU08 | Publicar telemetría | `comunicacion`, `modem` | — | H3 | I4 |
 | CU09 | Alertar pulsera suelta | `pulsera`, `avisos` → `comunicacion` | HU10 | H2 | I5 |
-| CU10 | Sonar el bastón desde la app | `comandos`, `avisos`, `boton` | HU07 | H3 | I6 |
+| CU10 | Sonar el bastón desde la app | `comandos`, `comunicacion`, `avisos`, `boton` | HU07 | H3 | I6 |
 | CU11 | Avisar batería baja | `bateria`, `energia`, `avisos` → `comunicacion` | HU06 | H1 | I7 |
 | CU12 | Configurar ajustes | `ajustes` (+ recepción en `comunicacion`) | HU09 | H1 | I6 |
 

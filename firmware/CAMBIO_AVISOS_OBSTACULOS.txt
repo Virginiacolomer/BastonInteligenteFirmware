@@ -3,8 +3,10 @@ CAMBIO EN LOS AVISOS DE OBSTÁCULOS (CU01 / CU02)
 Fecha: 20/11/2026
 Firmware: baston/ (versión 0.1.0)
 
-ATENCIÓN: este cambio se aparta del patrón de avisos del documento del proyecto
-(cap. 8, contrato fijo). Se subió directo a main: hay que revisarlo con el grupo.
+ESTADO (22/11/2026): INCORPORADO al documento unificado, revisión D (cap. 2,
+cap. 8 y CU01/CU02). Esta nota queda como historial del cambio.
+Actualización 22/11/2026: ver puntos 6 (se elimina el ajuste dist_alto_cm) y
+7 (latencia del aviso) para llevar a la documentación.
 
 
 1. QUÉ CAMBIA
@@ -31,7 +33,7 @@ AHORA:
   - El límite de 1,5 m es el ajuste "dist_bajo_cm" que ya existía (se cambia de
     50 a 200 cm desde la app). Si se pone en 1 m o menos, el tramo de vibración
     desaparece.
-  - El ajuste "dist_alto_cm" queda en la API pero ya NO se usa.
+  - El ajuste "dist_alto_cm" se ELIMINÓ (ver punto 6).
 
 
 2. SIN PARPADEOS (HISTÉRESIS)
@@ -48,7 +50,7 @@ aviso no se prende y se apaga cuando el objeto está justo en un límite.
     - Nuevos: DIST_CERCA_CM = 50 y DIST_MEDIO_CM = 100.
     - Se quitó KP_MOTOR (la intensidad ahora va de PWM_MOTOR_MIN = 90 en el
       límite a PWM_MOTOR_MAX = 255 a 1 m).
-    - DIST_AVISO_ALTO_CM queda marcado como "no se usa".
+    - DIST_AVISO_ALTO_CM se eliminó (ver punto 6).
 
   baston/avisos.h / avisos.cpp
     - Nuevo patrón PATRON_OBSTACULO_CERCA (buzzer continuo).
@@ -74,13 +76,56 @@ aviso no se prende y se apaga cuando el objeto está justo en un límite.
        - por debajo de 50 cm el buzzer suena de forma continua.
   3. Alejarlo y verificar que los cambios se dan unos 8 cm más lejos.
 
-  El código no se pudo compilar en esta PC: compilar en el Arduino IDE antes
-  de cargarlo.
+  Compilado el 22/11/2026 con el core esp32 3.3.12 (ESP32S3 Dev Module).
 
 
 5. A DECIDIR CON EL GRUPO
 -------------------------
   - Si se acepta el cambio, actualizar el cap. 8 del documento del proyecto.
   - Si por debajo de 1 m también tiene que vibrar el motor (además del buzzer).
-  - Qué hacer con el ajuste "dist_alto_cm", que quedó sin uso (avisar a S1 y S2,
-    que manejan el backend y la app).
+  - (Resuelto) El ajuste "dist_alto_cm" se elimina: ver punto 6.
+
+
+6. SE ELIMINA EL AJUSTE "dist_alto_cm" (22/11/2026)
+---------------------------------------------------
+Con los tramos de la rev. D el pitido va fijo de 50 cm a 1 m y el único límite
+ajustable es "dist_bajo_cm" (borde de la vibración). El ajuste "dist_alto_cm"
+no se usa ni se va a usar, así que se borró del firmware:
+  - config.h:    se quitó DIST_AVISO_ALTO_CM.
+  - ajustes.h:   se quitó el campo distAltoCm, el getter distAvisoAlto() y su
+                 rango (50–150).
+  - ajustes.cpp: se quitó distAvisoAlto().
+
+OJO, NO CONFUNDIR: en la TELEMETRÍA (bastón → backend) sigue existiendo el
+campo "dist_alto_cm", que es la DISTANCIA MEDIDA por el sensor alto. Ese campo
+se mantiene igual. Lo que se elimina es solo el AJUSTE que venía en la
+respuesta ("ajustes": {...}).
+
+Para actualizar en la documentación y avisar a S1 (backend) y S2 (app):
+  - Cap. 7, "Respuesta a la telemetría": sacar "dist_alto_cm" del objeto
+    "ajustes".
+  - CU12, flujo principal paso 2: sacar "la distancia de aviso alto (50–150 cm)".
+  - Cap. 13, primera fila: actualizar la respuesta (todavía habla de
+    "vibración por debajo de 150 cm" y "pitido por debajo de 100 cm").
+  - Backend: GET/PUT /api/v1/ajustes ya no lleva ese campo.
+  - App: la pantalla Ajustes ya no lo muestra.
+Si el backend lo sigue mandando, el bastón lo ignora (no rompe nada).
+
+
+7. LATENCIA DEL AVISO (para aclarar en la documentación)
+--------------------------------------------------------
+El plan de validación (cap. 15, nivel 2) pide menos de 150 ms desde que
+aparece el obstáculo hasta el aviso. Con los parámetros del CU01:
+  - se dispara un sensor cada 30 ms alternando, o sea cada sensor mide cada
+    60 ms;
+  - el filtro de mediana de 5 muestras necesita 3 lecturas nuevas (la mayoría)
+    para cambiar de valor.
+Por eso la demora va de unos 120 ms a unos 180 ms, según en qué momento del
+ciclo aparezca el obstáculo. En el peor caso se pasa de los 150 ms.
+
+Decisión del grupo: se acepta así por ahora. Opciones si hiciera falta:
+  - Bajar MUESTRAS_MEDIANA a 3 en config.h (demora ~60–120 ms, filtra menos
+    lecturas sueltas).
+  - O aclarar en el cap. 15 que el criterio es ≤ 200 ms.
+La medición ya no frena el programa (sensores.cpp usa interrupciones en vez
+de pulseIn), así que la demora viene solo del filtro, no del código.

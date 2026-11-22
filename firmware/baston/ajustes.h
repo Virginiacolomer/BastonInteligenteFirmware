@@ -17,7 +17,7 @@
  *     reinicios, así el backend no confunde eventos nuevos con reintentos).
  *
  * Rangos válidos (fuera de rango → se ignora ese valor):
- *   panico_s 3–10 · dist_bajo_cm 50–200 · dist_alto_cm 50–150
+ *   panico_s 3–10 · dist_bajo_cm 50–200
  *   telemetria_s 30–300 · modo_casa true/false
  * ========================================================================== */
 #pragma once
@@ -28,7 +28,6 @@ struct ValoresAjustes {
   uint16_t version       = 0;
   uint8_t  panicoS       = TIEMPO_PANICO_MS / 1000;
   uint16_t distBajoCm    = DIST_AVISO_BAJO_CM;
-  uint16_t distAltoCm    = DIST_AVISO_ALTO_CM;
   uint16_t telemetriaS   = TELEMETRIA_S;
   bool     modoCasa      = false;
 };
@@ -40,7 +39,6 @@ namespace ajustes {
   uint16_t version();
   uint32_t tiempoPanicoMs();
   uint16_t distAvisoBajo();
-  uint16_t distAvisoAlto();
   uint32_t periodoTelemetriaMs();
   bool     modoCasa();
 

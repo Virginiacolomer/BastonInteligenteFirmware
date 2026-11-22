@@ -23,6 +23,7 @@
 #include "bateria.h"
 #include "comandos.h"
 #include "comunicacion.h"
+#include "consola.h"
 
 void setup() {
   Serial.begin(115200);
@@ -56,6 +57,7 @@ void setup() {
 
 void loop() {
   // Orden: primero leer entradas, después decidir, al final actuar.
+  consola::actualizar();        // teclas de prueba del monitor serie
 #if USAR_SENSORES
   sensores::actualizar();
   obstaculos::actualizar();     // CU01, CU02
