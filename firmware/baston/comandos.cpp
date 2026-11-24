@@ -67,7 +67,21 @@ void actualizar() {
     if (millis() - desdeMs >= duracionMs) parar("pasó la duración");
     else if (boton::huboToqueCorto())     parar("toque al pulsador");
   }
+#if PRUEBA_BOTON_SONAR
+  // ---------------------------------------------------------------------------
+  // PRUEBA TEMPORAL (ver PRUEBA_BOTON_SONAR en config.h): sin app, un toque
+  // corto al pulsador ARRANCA el sonar, como si hubiera llegado el comando.
+  // No manda ack (no hubo comando del backend). Borrar cuando la app esté lista.
+  // ---------------------------------------------------------------------------
+  else if (boton::huboToqueCorto()) {
+    empezar(DURACION_SONAR_S, "PRUEBA: toque al pulsador, sin app ni ack");
+  }
+#endif
 }
+
+#if PRUEBA_BOTON_SONAR && !USAR_BOTON
+#warning "PRUEBA_BOTON_SONAR necesita USAR_BOTON 1: sin eso el pulsador no se lee"
+#endif
 
 bool sonando() { return activo; }
 

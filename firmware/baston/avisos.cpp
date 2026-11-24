@@ -63,11 +63,12 @@ static uint16_t activos = 0;                 // un bit por patrón continuo
 static uint32_t inicioContinuo[PATRON_CANTIDAD] = {0};
 static Patron   unaVez = PATRON_NINGUNO;
 static uint32_t inicioUnaVez = 0;
-#if DEBUG_AVISOS
+// Nombre de cada patrón (se usa en actualizar() siempre, aunque solo se imprime con DEBUG_AVISOS).
 static const char *const NOMBRE[] = {
   "ninguno", "cuenta_panico", "panico_enviado", "panico_confirmado",
   "envio_fallido", "pulsera_suelta", "sonar_baston", "bateria_baja"};
 static_assert(sizeof(NOMBRE) / sizeof(NOMBRE[0]) == PATRON_CANTIDAD, "NOMBRE: una fila por patrón");
+#if DEBUG_AVISOS
 static const char *ultimoNombre = "ninguno";
 // Prueba de banco (teclas del monitor serie, ver consola.h). Mientras dura,
 // le gana a todo lo demás para que se note qué está fallando.

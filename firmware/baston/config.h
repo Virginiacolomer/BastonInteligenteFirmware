@@ -24,7 +24,7 @@
 //     Cuando se sumen los demás módulos, volver a poner en 1 los que correspondan.
 #define USAR_SENSORES      1   // H4
 #define USAR_AVISOS        1   // H4
-#define USAR_BOTON         0   // H3
+#define USAR_BOTON         1   // H3 (en 1 para la PRUEBA_BOTON_SONAR de abajo)
 #define USAR_PULSERA       1   // H2
 #define USAR_ENERGIA       0   // H1
 #define USAR_MODEM         0   // H3 (0 = el bastón funciona sin red: útil en banco)
@@ -37,6 +37,14 @@
 #define DEBUG_MODEM        0
 #define DEBUG_COMUNICACION 0
 #define DEBUG_COMANDOS     1   // tecla 'b' en el monitor serie: simula «Encontrar mi bastón» (CU10)
+
+// >>> PRUEBA TEMPORAL (CU10 sin app) <<<
+// Mientras la app no esté conectada, un TOQUE CORTO al pulsador (< 1 s)
+// arranca «Encontrar mi bastón» (buzzer + vibración 30 s), como si la app
+// hubiera mandado el comando. Otro toque corto lo apaga (eso sí es CU10 4a).
+// Necesita USAR_BOTON 1. Mantener apretado 5 s sigue siendo el pánico (CU03).
+// ⚠ Poner en 0 (o borrar) cuando la app mande el comando de verdad.
+#define PRUEBA_BOTON_SONAR 1
 
 #define VERSION_FIRMWARE   "0.1.0"
 #define VERSION_CONTRATO   "v1"     // ruta /api/v1 del cap. 7
