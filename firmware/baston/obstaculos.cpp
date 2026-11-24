@@ -29,7 +29,7 @@ static Zona    zona = ZONA_NADA;
 static uint8_t pwmActual = 0;
 #if DEBUG_SENSORES
 static uint32_t ultimoDebugMs = 0;
-static bool     debugPausado = false;
+static bool     debugPausado = true;    // arranca en pausa: el CSV tapa los demás mensajes
 static bool     avisoBajo = true, avisoAlto = true;   // último estado informado de cada sensor
 #endif
 
@@ -57,7 +57,7 @@ static Patron patronDe(Zona z) {
 
 void iniciar() {
 #if DEBUG_SENSORES
-  Serial.println("ms,bajo_cm,alto_cm,motor_pwm,zona");   // zona: 0 cerca, 1 medio, 2 vibra, 3 nada
+  Serial.println("# CSV de sensores en pausa: 's' para verlo, 'r' para una sola lectura");
 #endif
 }
 
@@ -100,6 +100,15 @@ void actualizar() {
   if (consola::tecla('s')) {
     debugPausado = !debugPausado;
     Serial.println(debugPausado ? "# CSV en pausa ('s' para seguir)" : "ms,bajo_cm,alto_cm,motor_pwm,zona");
+  }
+  // La letra 'r' muestra UNA lectura completa (filtrada y cruda), sin el CSV.
+  if (consola::tecla('r')) {
+    static const char *const ZONA[] = {"cerca (<50 cm: buzzer continuo)", "medio (50-100 cm: pitidos)",
+                                       "vibra (100 cm al limite)", "nada"};
+    Serial.printf("# bajo %u cm (crudo %u, %s) · alto %u cm (crudo %u, %s)\n",
+                  dBajo, sensores::crudaBajo(), sensores::respondeBajo() ? "responde" : "NO responde",
+                  dAlto, sensores::crudaAlto(), sensores::respondeAlto() ? "responde" : "NO responde");
+    Serial.printf("#   zona %s · motor PWM %u\n", ZONA[zona], pwmActual);
   }
   // CU01 1a: avisa una vez cuando un sensor deja de responder o vuelve.
   bool rb = sensores::respondeBajo(), ra = sensores::respondeAlto();

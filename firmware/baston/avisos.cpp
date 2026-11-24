@@ -12,13 +12,14 @@
  * ========================================================================== */
 #include "config.h"
 #include "avisos.h"
+#include "consola.h"
 #include <initializer_list>
 
 #define PWM_FREQ_HZ       20000   // 20 kHz: fuera del rango audible, el motor no "chilla"
 #define PWM_BITS          8       // 0–255
 #define PWM_CANAL         2       // canal 2 para no chocar con tone() (que usa canal 0 en core 2.x)
 
-#define BUZZER_PASIVO     false   // cambiar a true si el buzzer es pasivo (solo hace "clic" con HIGH)
+#define BUZZER_PASIVO     false   // el del bastón es ACTIVO (suena solo con 3,3 V). true solo si hace "clic" con HIGH
 #define BUZZER_FREQ_HZ    2000    // frecuencia en Hz cuando BUZZER_PASIVO es true
 
 namespace avisos {
@@ -65,6 +66,17 @@ static Patron   unaVez = PATRON_NINGUNO;
 static uint32_t inicioUnaVez = 0;
 #if DEBUG_AVISOS
 static Patron   ultimoDebug = PATRON_NINGUNO;
+static const char *const NOMBRE[] = {
+  "ninguno", "obstaculo_medio", "obstaculo_cerca", "cuenta_panico", "panico_enviado",
+  "panico_confirmado", "envio_fallido", "pulsera_suelta", "sonar_baston", "bateria_baja"};
+static_assert(sizeof(NOMBRE) / sizeof(NOMBRE[0]) == PATRON_CANTIDAD, "NOMBRE: una fila por patrón");
+// Prueba de banco (teclas del monitor serie, ver consola.h). Mientras dura,
+// le gana a todo lo demás para que se note qué está fallando.
+//   'z': buzzer solo, 1 s (si solo hace «clic», el buzzer es pasivo → BUZZER_PASIVO true)
+//   'm': motor solo, 1 s al mínimo (PWM_MOTOR_MIN) y 1 s al máximo (PWM_MOTOR_MAX)
+enum Prueba : uint8_t { PRUEBA_NADA, PRUEBA_BUZZER, PRUEBA_MOTOR };
+static Prueba   prueba = PRUEBA_NADA;
+static uint32_t pruebaDesdeMs = 0;
 #endif
 
 static void escribirMotor(uint8_t valor) {
@@ -166,19 +178,31 @@ void actualizar() {
     bool on;
     if (sonando(p, on)) { buzzer = on; elegido = p; break; }
   }
-  escribirBuzzer(buzzer);
-  
-
   // 2. Motor: patrones con vibración propia, si no la de obstáculo bajo
   uint8_t motor = pwmObstaculo;
   for (Patron p : {PATRON_PANICO_ENVIADO, PATRON_SONAR_BASTON}) {
     bool on;
     if (DEF[p].motor && sonando(p, on)) { motor = on ? PWM_MOTOR_MAX : 0; break; }
   }
+
+#if DEBUG_AVISOS
+  // Prueba de banco: pisa lo calculado arriba mientras dura.
+  if (consola::tecla('z')) { prueba = PRUEBA_BUZZER; pruebaDesdeMs = millis(); Serial.println("# prueba: buzzer 1 s"); }
+  if (consola::tecla('m')) { prueba = PRUEBA_MOTOR;  pruebaDesdeMs = millis();
+                             Serial.printf("# prueba: motor 1 s a PWM %u y 1 s a PWM %u\n", PWM_MOTOR_MIN, PWM_MOTOR_MAX); }
+  if (prueba != PRUEBA_NADA) {
+    uint32_t t = millis() - pruebaDesdeMs;
+    if (prueba == PRUEBA_BUZZER && t < 1000) { buzzer = true;  motor = 0; }
+    else if (prueba == PRUEBA_MOTOR && t < 2000) { buzzer = false; motor = t < 1000 ? PWM_MOTOR_MIN : PWM_MOTOR_MAX; }
+    else { prueba = PRUEBA_NADA; Serial.println("# prueba: fin"); }
+  }
+#endif
+
+  escribirBuzzer(buzzer);
   escribirMotor(motor);
 
 #if DEBUG_AVISOS
-  if (elegido != ultimoDebug) { Serial.printf("[avisos] buzzer: patron %u\n", elegido); ultimoDebug = elegido; }
+  if (elegido != ultimoDebug) { Serial.printf("# avisos: buzzer -> %s\n", NOMBRE[elegido]); ultimoDebug = elegido; }
 #else
   (void)elegido;
 #endif

@@ -28,6 +28,18 @@
 void setup() {
   Serial.begin(115200);
   Serial.printf("\n[baston] firmware %s · contrato %s\n", VERSION_FIRMWARE, VERSION_CONTRATO);
+#if DEBUG_SENSORES || DEBUG_AVISOS || DEBUG_COMANDOS
+  Serial.println("# teclas de prueba (escribir la letra y Enter):");
+#if DEBUG_SENSORES
+  Serial.println("#   r una lectura de los sensores · s activa/pausa el CSV continuo");
+#endif
+#if DEBUG_AVISOS
+  Serial.println("#   z buzzer 1 s · m motor 1 s al minimo + 1 s al maximo");
+#endif
+#if DEBUG_COMANDOS
+  Serial.println("#   b simula «Encontrar mi baston» (otra b lo apaga)");
+#endif
+#endif
 
   iniciarEstado();
   ajustes::iniciar();
