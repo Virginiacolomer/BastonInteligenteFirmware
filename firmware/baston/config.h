@@ -29,8 +29,8 @@
 #define USAR_ENERGIA       0   // H1
 #define USAR_MODEM         0   // H3 (0 = el bastón funciona sin red: útil en banco)
 
-#define DEBUG_SENSORES     1  // CSV por el monitor serie: ms,bajo_cm,alto_cm,motor_pwm,zona
-#define DEBUG_AVISOS       0
+#define DEBUG_SENSORES     1  // CSV por el monitor serie: ms,bajo_cm,alto_cm,motor_ms,buzzer_ms
+#define DEBUG_AVISOS       0   // 1 = teclas 'z' (buzzer) y 'm' (motor) + qué patrón suena
 #define DEBUG_PANICO       0
 #define DEBUG_PULSERA      1
 #define DEBUG_ENERGIA      0
@@ -70,17 +70,24 @@
 // ---------------------------------------------------------------------------
 // 4. VALORES POR DEFECTO
 // ---------------------------------------------------------------------------
-// CU01/CU02 · obstáculos: se usa la distancia MÁS CERCANA de los dos sensores
-//   d < DIST_CERCA_CM ..................... buzzer continuo
-//   DIST_CERCA_CM ≤ d < DIST_MEDIO_CM ..... pitido intermitente
-//   DIST_MEDIO_CM ≤ d < DIST_AVISO_BAJO_CM  vibración proporcional
-//   d ≥ DIST_AVISO_BAJO_CM ................ sin aviso
-#define DIST_CERCA_CM             50
-#define DIST_MEDIO_CM            100
-#define DIST_AVISO_BAJO_CM       150   // ajustable (CU12): 50–200 · límite de la vibración
-#define HISTERESIS_CM              8   // para pasar a un tramo más lejano hay que superar el límite + 8 cm
-#define PWM_MOTOR_MIN             90   // en el límite de aviso
-#define PWM_MOTOR_MAX            255   // a DIST_MEDIO_CM
+// CU01/CU02 · obstáculos: cada sensor tiene SU aviso, con la misma regla
+//   sensor ALTO → buzzer · sensor BAJO → motor vibrador
+//   d ≥ límite ............................ nada
+//   continuo ≤ d < límite ................. pulsos de PULSO_AVISO_MS; el periodo
+//        baja de PERIODO_AVISO_LEJOS_MS (en el límite) a PERIODO_AVISO_CERCA_MS
+//        (en la distancia de continuo): mientras más cerca, más seguido
+//   d < continuo .......................... continuo (fijo)
+// El ALTO apunta a la altura de la cabeza: queda fijo antes (80 cm) para que
+// haya tiempo de frenar o agacharse. Valores elegidos probando en banco.
+#define DIST_AVISO_ALTO_CM       120   // sensor alto: empieza a pitar intermitente
+#define DIST_CONTINUO_ALTO_CM     80   // sensor alto: pitido fijo por debajo de esto
+#define DIST_AVISO_BAJO_CM       120   // sensor bajo: empieza a vibrar · ajustable (CU12): 50–200
+#define DIST_CONTINUO_BAJO_CM     50   // sensor bajo: vibración fija por debajo de esto
+#define HISTERESIS_CM              8   // para apagar o dejar el continuo hay que alejarse 8 cm más del borde
+#define PULSO_AVISO_MS           100   // duración de cada pitido / vibración
+#define PERIODO_AVISO_LEJOS_MS  1000   // en el límite de aviso: 1 pulso por segundo
+#define PERIODO_AVISO_CERCA_MS   200   // justo antes del continuo: 5 pulsos por segundo
+#define PWM_MOTOR_MAX            255   // intensidad del motor en cada pulso (bajarla si vibra demasiado)
 // Medición
 #define PERIODO_MEDICION_MS       30   // alterna bajo/alto cada 30 ms
 #define TIMEOUT_ECO_US         25000   // sin eco → 400 cm (sin obstáculo)

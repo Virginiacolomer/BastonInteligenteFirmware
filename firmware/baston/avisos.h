@@ -16,16 +16,17 @@
  *       2. PATRON_CUENTA_PANICO (1 pitido por segundo)
  *       3. PATRON_PULSERA_SUELTA
  *       4. PATRON_SONAR_BASTON
- *       5. PATRON_OBSTACULO_CERCA
- *       6. PATRON_OBSTACULO_MEDIO
- *       7. PATRON_BATERIA_BAJA
- *     Motor: la vibración de obstáculo (1 m al límite de aviso) es CONTINUA y proporcional;
- *       los patrones de PATRON_SONAR_BASTON y PATRON_PANICO_ENVIADO la
- *       reemplazan mientras duran.
+ *       5. obstáculo del sensor ALTO (obstaculoBuzzer)
+ *       6. PATRON_BATERIA_BAJA
+ *     Motor: obstáculo del sensor BAJO (obstaculoMotor); PATRON_SONAR_BASTON y
+ *       PATRON_PANICO_ENVIADO lo reemplazan mientras duran.
+ *
+ *   Aviso de obstáculos (CU02): pulsos de PULSO_AVISO_MS encendido cada
+ *   `periodoMs`. obstaculos.cpp acorta el periodo a medida que se acerca el
+ *   obstáculo; AVISO_CONTINUO = encendido sin cortes; 0 = apagado.
+ *   El cambio de periodo se aplica sin cortar el pulso en curso.
  *
  * Tabla de patrones (cap. 8):
- *   OBSTACULO_CERCA ..... buzzer continuo (obstáculo a menos de 50 cm)
- *   OBSTACULO_MEDIO ..... pitido 120 ms cada 400 ms (obstáculo entre 50 cm y 1 m)
  *   CUENTA_PANICO ....... pitido corto cada 1 s
  *   PANICO_ENVIADO ...... pitido largo 1 s + vibración
  *   PANICO_CONFIRMADO ... 2 pitidos cortos (el backend respondió OK)
@@ -39,8 +40,6 @@
 
 enum Patron : uint8_t {
   PATRON_NINGUNO,
-  PATRON_OBSTACULO_MEDIO,     // continuo  · CU01/CU02 · 50 cm a 1 m
-  PATRON_OBSTACULO_CERCA,     // continuo  · CU01/CU02 · menos de 50 cm
   PATRON_CUENTA_PANICO,       // continuo  · CU03
   PATRON_PANICO_ENVIADO,      // una vez   · CU03
   PATRON_PANICO_CONFIRMADO,   // una vez   · CU03
@@ -51,11 +50,15 @@ enum Patron : uint8_t {
   PATRON_CANTIDAD             // (no es un patrón: cantidad total)
 };
 
+constexpr uint16_t AVISO_CONTINUO = 1;    // periodo especial: encendido sin cortes
+
 namespace avisos {
   void iniciar();                         // configura PWM del motor y el pin del buzzer
   void actualizar();                      // avanza los patrones activos (llamar en cada loop)
 
-  void vibrarObstaculo(uint8_t pwm);      // 0 = apagado, 90–255 = intensidad continua
+  // Obstáculos (CU02): 0 = apagado · AVISO_CONTINUO = sin cortes · otro = periodo en ms
+  void obstaculoBuzzer(uint16_t periodoMs);   // sensor ALTO
+  void obstaculoMotor(uint16_t periodoMs);    // sensor BAJO
   void activar(Patron p);                 // patrones CONTINUOS: suenan hasta desactivar()
   void desactivar(Patron p);
   void reproducir(Patron p);              // patrones de UNA VEZ: suenan y terminan solos

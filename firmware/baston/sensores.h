@@ -11,9 +11,10 @@
  *      alto para que no se interfieran.
  *   2. Si no hay eco en 25 ms, toma 400 cm (sin obstáculo).
  *   3. Aplica un filtro de MEDIANA de 5 muestras a cada sensor.
- *   (Los pasos 4 y 5 —la menor distancia y el aviso— están en obstaculos.)
+ *   (Los pasos 4 y 5 —el aviso de cada sensor— están en obstaculos.)
  *   1a. Sensor que no responde (cable suelto): marca 400 cm y lo informa con
- *       respondeBajo()/respondeAlto(); el aviso queda a cargo del otro.
+ *       respondeBajo()/respondeAlto(); su aviso queda apagado (alto = buzzer,
+ *       bajo = motor: el otro sensor no lo reemplaza).
  *
  * No bloquea: el ancho del ECHO se mide con interrupciones (sin pulseIn).
  * Qué NO hace: decidir avisos (obstaculos.cpp) ni escribir en `estado`.

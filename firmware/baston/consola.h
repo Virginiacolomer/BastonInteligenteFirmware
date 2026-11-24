@@ -12,7 +12,7 @@
  *   s ... activa / pausa el CSV de sensores (arranca en pausa) (obstaculos, DEBUG_SENSORES)
  *   r ... una lectura: distancias, crudas, zona y PWM (obstaculos, DEBUG_SENSORES)
  *   z ... prueba el buzzer solo, 1 s               (avisos,     DEBUG_AVISOS)
- *   m ... prueba el motor: 1 s al mínimo y 1 s al máximo (avisos, DEBUG_AVISOS)
+ *   m ... prueba el motor solo, 1 s                (avisos,     DEBUG_AVISOS)
  *   b ... simula «Encontrar mi bastón» (CU10)      (comandos,   DEBUG_COMANDOS)
  * Al agregar una tecla, sumarla a esta lista para no repetirla.
  * ========================================================================== */

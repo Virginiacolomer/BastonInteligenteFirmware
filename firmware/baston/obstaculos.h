@@ -4,23 +4,25 @@
  * Capa:          FUNCIÓN (caso de uso)
  * Dueño:         H4 · Detección de obstáculos   · Paquete fase 2: I1
  * Casos de uso:  CU01 Detectar obstáculos (pasos 4–5) · CU02 Avisar según la distancia
- * Historias:     HU01 (vibración 1–1,5 m) · HU02 (pitido < 1 m, continuo < 50 cm)
- * Pruebas:       P2 vibra desde ~150 cm y aumenta hasta 1 m
- *                P3 no titila con el objeto quieto en un borde de tramo
- *                P4 una «rama» a 1,6 m de altura se detecta a 1 m (sensor alto)
+ * Historias:     HU01, HU02
+ * Pruebas:       P2 el aviso empieza en el límite y se acelera al acercarse
+ *                P3 no titila con el objeto quieto en un borde
+ *                P4 una «rama» a 1,6 m de altura hace sonar el buzzer (sensor alto)
  *
- * Qué hace (cap. 8, rev. D):
- *   d = la menor de sensores::distanciaBajo() y sensores::distanciaAlto()
- *       (el aviso es el mismo si el obstáculo está abajo o a la altura de la cabeza)
- *   d < 50 cm ............... buzzer continuo  → PATRON_OBSTACULO_CERCA
- *   50 cm ≤ d < 1 m ......... pitido 120/400 ms → PATRON_OBSTACULO_MEDIO
- *   1 m ≤ d < límite ........ vibración proporcional PWM 255 (1 m) → 90 (límite)
- *                             (límite = ajustes::distAvisoBajo(), 150 cm por defecto)
- *   d ≥ límite .............. nada
- *   Al acercarse cambia de tramo enseguida; al alejarse, cuando d supera el
- *   borde + HISTERESIS_CM (8 cm).
+ * Qué hace (cambia el cap. 8 de la rev. D, ver CAMBIO_AVISOS_OBSTACULOS.txt punto 8):
+ *   Cada sensor tiene SU aviso, con la misma regla:
+ *     sensor ALTO (cabeza/torso) → BUZZER
+ *     sensor BAJO (suelo)        → MOTOR VIBRADOR
+ *                       intermitente desde    fijo por debajo de
+ *     ALTO (buzzer) ..... 120 cm                 80 cm   (cabeza: fijo antes)
+ *     BAJO (motor) ...... 120 cm (ajuste CU12)   50 cm
+ *   En el tramo intermitente: pulsos de 100 ms, 1 por segundo en el límite y
+ *   5 por segundo justo antes del fijo (más cerca = más seguido).
+ *   Histéresis de HISTERESIS_CM (8 cm) para apagar y para salir del continuo.
  *   Si suena algo de mayor prioridad (pánico, pulsera, sonar), el buzzer lo
- *   decide avisos.cpp; la vibración de obstáculo sigue.
+ *   decide avisos.cpp; el motor solo lo pisan sonar y pánico enviado.
+ *   ⚠ Si un sensor deja de responder (CU01 1a), su aviso queda apagado: el otro
+ *     sensor NO lo cubre, porque cada uno avisa con un actuador distinto.
  * Además: copia ambas distancias en `estado` (viajan en la telemetría, CU08).
  *
  * ⚠ SEGURIDAD: este módulo nunca depende de la red. Tiene que funcionar aunque

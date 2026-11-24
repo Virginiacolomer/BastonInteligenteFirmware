@@ -4,9 +4,10 @@
  * Cada patrón es una lista de pasos {ms encendido, ms apagado}.
  *   - Continuos (repite = true): se repiten mientras estén activos.
  *   - De una vez (repite = false): suenan una vez desde reproducir() y terminan.
- * El buzzer reproduce SOLO el patrón de mayor prioridad que esté sonando.
- * El motor vibra con SONAR_BASTON / PANICO_ENVIADO si están; si no, con la
- * intensidad de obstáculo (tramo de 1 m al límite de aviso).
+ * El buzzer reproduce SOLO el patrón de mayor prioridad que esté sonando; si
+ * no hay ninguno por encima, los pulsos de obstáculo del sensor ALTO.
+ * El motor vibra con SONAR_BASTON / PANICO_ENVIADO si están; si no, con los
+ * pulsos de obstáculo del sensor BAJO (a PWM_MOTOR_MAX).
  * Buzzer ACTIVO: alcanza con HIGH/LOW (no necesita tono). Si su buzzer es
  * pasivo (no suena con HIGH fijo), cambiar BUZZER_ON por tone(PIN_BUZZER, 2700).
  * ========================================================================== */
@@ -28,8 +29,6 @@ struct Paso { uint16_t on, off; };
 struct Def  { const Paso *pasos; uint8_t n; bool repite; bool motor; };
 
 // --- Patrones del cap. 8 ---
-static const Paso P_MEDIO[]       = {{120, 280}};                          // cada 400 ms
-static const Paso P_CERCA[]       = {{1000, 0}};                           // continuo (sin silencio)
 static const Paso P_CUENTA[]      = {{80, 920}};                           // 1 por segundo
 static const Paso P_ENVIADO[]     = {{1000, 0}};                           // largo 1 s
 static const Paso P_CONFIRMADO[]  = {{100, 100}, {100, 0}};                // 2 cortos
@@ -40,8 +39,6 @@ static const Paso P_BATERIA[]     = {{600, 300}, {600, 0}};                // 2 
 
 static const Def DEF[] = {
   /* NINGUNO           */ {nullptr, 0, false, false},
-  /* OBSTACULO_MEDIO   */ {P_MEDIO, 1, true, false},
-  /* OBSTACULO_CERCA   */ {P_CERCA, 1, true, false},
   /* CUENTA_PANICO     */ {P_CUENTA, 1, true, false},
   /* PANICO_ENVIADO    */ {P_ENVIADO, 1, false, true},
   /* PANICO_CONFIRMADO */ {P_CONFIRMADO, 2, false, false},
@@ -51,29 +48,31 @@ static const Def DEF[] = {
   /* BATERIA_BAJA      */ {P_BATERIA, 2, false, false},
 };
 
-// Orden de prioridad del buzzer (el primero que esté sonando gana)
-static const Patron PRIORIDAD[] = {
+// Orden de prioridad del buzzer (el primero que esté sonando gana).
+// Después de estos va el obstáculo del sensor alto y al final BATERIA_BAJA (ver actualizar()).
+static const Patron PRIORIDAD_ALTA[] = {
   PATRON_PANICO_ENVIADO, PATRON_ENVIO_FALLIDO, PATRON_PANICO_CONFIRMADO,
-  PATRON_CUENTA_PANICO, PATRON_PULSERA_SUELTA, PATRON_SONAR_BASTON,
-  PATRON_OBSTACULO_CERCA, PATRON_OBSTACULO_MEDIO, PATRON_BATERIA_BAJA
+  PATRON_CUENTA_PANICO, PATRON_PULSERA_SUELTA, PATRON_SONAR_BASTON
 };
 static_assert(sizeof(DEF) / sizeof(DEF[0]) == PATRON_CANTIDAD, "DEF tiene que tener una fila por patrón, en el orden del enum");
 
-static uint8_t  pwmObstaculo = 0;
+// Pulsos de obstáculo (CU02): buzzer = sensor alto · motor = sensor bajo.
+struct Pulsos { uint16_t periodo; uint32_t inicio; };
+static Pulsos pulsoBuzzer = {0, 0}, pulsoMotor = {0, 0};
 static uint16_t activos = 0;                 // un bit por patrón continuo
 static uint32_t inicioContinuo[PATRON_CANTIDAD] = {0};
 static Patron   unaVez = PATRON_NINGUNO;
 static uint32_t inicioUnaVez = 0;
 #if DEBUG_AVISOS
-static Patron   ultimoDebug = PATRON_NINGUNO;
 static const char *const NOMBRE[] = {
-  "ninguno", "obstaculo_medio", "obstaculo_cerca", "cuenta_panico", "panico_enviado",
-  "panico_confirmado", "envio_fallido", "pulsera_suelta", "sonar_baston", "bateria_baja"};
+  "ninguno", "cuenta_panico", "panico_enviado", "panico_confirmado",
+  "envio_fallido", "pulsera_suelta", "sonar_baston", "bateria_baja"};
 static_assert(sizeof(NOMBRE) / sizeof(NOMBRE[0]) == PATRON_CANTIDAD, "NOMBRE: una fila por patrón");
+static const char *ultimoNombre = "ninguno";
 // Prueba de banco (teclas del monitor serie, ver consola.h). Mientras dura,
 // le gana a todo lo demás para que se note qué está fallando.
 //   'z': buzzer solo, 1 s (si solo hace «clic», el buzzer es pasivo → BUZZER_PASIVO true)
-//   'm': motor solo, 1 s al mínimo (PWM_MOTOR_MIN) y 1 s al máximo (PWM_MOTOR_MAX)
+//   'm': motor solo, 1 s a PWM_MOTOR_MAX
 enum Prueba : uint8_t { PRUEBA_NADA, PRUEBA_BUZZER, PRUEBA_MOTOR };
 static Prueba   prueba = PRUEBA_NADA;
 static uint32_t pruebaDesdeMs = 0;
@@ -134,6 +133,21 @@ static bool sonando(Patron p, bool &on) {
   return true;
 }
 
+static void fijarPulsos(Pulsos &p, uint16_t periodo) {
+  if (periodo != 0 && p.periodo == 0) p.inicio = millis();   // arranca con un pulso encendido
+  p.periodo = periodo;
+}
+
+// ¿Está encendido ahora? Si el periodo se acorta, el próximo pulso llega antes.
+static bool pulsoEncendido(Pulsos &p) {
+  if (p.periodo == 0) return false;
+  if (p.periodo == AVISO_CONTINUO) return true;
+  uint32_t t = millis() - p.inicio;
+  if (t >= p.periodo) { p.inicio = millis(); t = 0; }
+  uint16_t on = PULSO_AVISO_MS < p.periodo ? PULSO_AVISO_MS : p.periodo / 2;
+  return t < on;
+}
+
 void iniciar() {
   pinMode(PIN_BUZZER, OUTPUT);
   digitalWrite(PIN_BUZZER, LOW);
@@ -146,7 +160,8 @@ void iniciar() {
   escribirMotor(0);
 }
 
-void vibrarObstaculo(uint8_t pwm) { pwmObstaculo = pwm; }
+void obstaculoBuzzer(uint16_t periodoMs) { fijarPulsos(pulsoBuzzer, periodoMs); }
+void obstaculoMotor(uint16_t periodoMs)  { fijarPulsos(pulsoMotor,  periodoMs); }
 
 void activar(Patron p) {
   if (!DEF[p].repite) { reproducir(p); return; }
@@ -165,21 +180,30 @@ void reproducir(Patron p) {
 void silenciarTodo() {
   activos = 0;
   unaVez = PATRON_NINGUNO;
-  pwmObstaculo = 0;
+  pulsoBuzzer.periodo = 0;
+  pulsoMotor.periodo = 0;
   escribirBuzzer(false);
   escribirMotor(0);
 }
 
 void actualizar() {
-  // 1. Buzzer: el patrón de mayor prioridad que esté sonando
+  // 1. Buzzer: el patrón de mayor prioridad que esté sonando;
+  //    si no hay, el obstáculo del sensor alto; si tampoco, batería baja.
   bool buzzer = false;
-  Patron elegido = PATRON_NINGUNO;
-  for (Patron p : PRIORIDAD) {
+  const char *nombre = "ninguno";
+  bool obstaculoOn = pulsoEncendido(pulsoBuzzer);   // se avanza siempre, suene o no
+  bool elegido = false;
+  for (Patron p : PRIORIDAD_ALTA) {
     bool on;
-    if (sonando(p, on)) { buzzer = on; elegido = p; break; }
+    if (sonando(p, on)) { buzzer = on; nombre = NOMBRE[p]; elegido = true; break; }
   }
-  // 2. Motor: patrones con vibración propia, si no la de obstáculo bajo
-  uint8_t motor = pwmObstaculo;
+  if (!elegido && pulsoBuzzer.periodo != 0) { buzzer = obstaculoOn; nombre = "obstaculo_alto"; elegido = true; }
+  if (!elegido) {
+    bool on;
+    if (sonando(PATRON_BATERIA_BAJA, on)) { buzzer = on; nombre = NOMBRE[PATRON_BATERIA_BAJA]; }
+  }
+  // 2. Motor: patrones con vibración propia; si no, el obstáculo del sensor bajo
+  uint8_t motor = pulsoEncendido(pulsoMotor) ? PWM_MOTOR_MAX : 0;
   for (Patron p : {PATRON_PANICO_ENVIADO, PATRON_SONAR_BASTON}) {
     bool on;
     if (DEF[p].motor && sonando(p, on)) { motor = on ? PWM_MOTOR_MAX : 0; break; }
@@ -189,11 +213,11 @@ void actualizar() {
   // Prueba de banco: pisa lo calculado arriba mientras dura.
   if (consola::tecla('z')) { prueba = PRUEBA_BUZZER; pruebaDesdeMs = millis(); Serial.println("# prueba: buzzer 1 s"); }
   if (consola::tecla('m')) { prueba = PRUEBA_MOTOR;  pruebaDesdeMs = millis();
-                             Serial.printf("# prueba: motor 1 s a PWM %u y 1 s a PWM %u\n", PWM_MOTOR_MIN, PWM_MOTOR_MAX); }
+                             Serial.printf("# prueba: motor 1 s a PWM %u\n", PWM_MOTOR_MAX); }
   if (prueba != PRUEBA_NADA) {
     uint32_t t = millis() - pruebaDesdeMs;
     if (prueba == PRUEBA_BUZZER && t < 1000) { buzzer = true;  motor = 0; }
-    else if (prueba == PRUEBA_MOTOR && t < 2000) { buzzer = false; motor = t < 1000 ? PWM_MOTOR_MIN : PWM_MOTOR_MAX; }
+    else if (prueba == PRUEBA_MOTOR && t < 1000) { buzzer = false; motor = PWM_MOTOR_MAX; }
     else { prueba = PRUEBA_NADA; Serial.println("# prueba: fin"); }
   }
 #endif
@@ -202,9 +226,9 @@ void actualizar() {
   escribirMotor(motor);
 
 #if DEBUG_AVISOS
-  if (elegido != ultimoDebug) { Serial.printf("# avisos: buzzer -> %s\n", NOMBRE[elegido]); ultimoDebug = elegido; }
+  if (nombre != ultimoNombre) { Serial.printf("# avisos: buzzer -> %s\n", nombre); ultimoNombre = nombre; }
 #else
-  (void)elegido;
+  (void)nombre;
 #endif
 }
 

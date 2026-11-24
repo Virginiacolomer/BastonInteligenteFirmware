@@ -129,3 +129,56 @@ Decisión del grupo: se acepta así por ahora. Opciones si hiciera falta:
   - O aclarar en el cap. 15 que el criterio es ≤ 200 ms.
 La medición ya no frena el programa (sensores.cpp usa interrupciones en vez
 de pulseIn), así que la demora viene solo del filtro, no del código.
+
+
+8. CADA SENSOR CON SU AVISO: ALTO → BUZZER, BAJO → MOTOR (cambia la rev. D)
+----------------------------------------------------------------------------
+Pedido del grupo: el sensor ALTO activa el pitido y el sensor BAJO activa el
+motor vibrador. Los dos con la misma regla: mientras más cerca, más rápido,
+hasta quedar continuo.
+
+Regla nueva (para cada sensor, con su propia distancia d):
+                      intermitente desde       fijo por debajo de
+  ALTO → buzzer ..... 120 cm (fijo)             80 cm
+  BAJO → motor ...... 120 cm ("dist_bajo_cm")   50 cm
+  d ≥ límite ................ nada
+  tramo intermitente ........ pulsos de 100 ms; el periodo va de 1000 ms (en
+                              el límite) a 200 ms (justo antes del fijo), lineal
+  debajo del fijo ........... continuo
+  El sensor ALTO pasa a fijo antes (80 cm) porque apunta a obstáculos que
+  pueden golpear la cabeza: hay que dar tiempo a frenar o agacharse.
+  Valores elegidos probando en banco. Se probó 200 cm para el alto y pitaba
+  todo el tiempo dentro de una habitación (paredes, techo).
+  OJO: el valor por defecto de "dist_bajo_cm" bajó de 150 a 120 cm (avisar a
+  S1 y S2: valor por defecto del ajuste en backend y app).
+  Histéresis de 8 cm para apagar y para salir del continuo.
+  El motor vibra siempre a PWM_MOTOR_MAX (255): lo que cambia es el ritmo,
+  no la intensidad.
+
+Lo que reemplaza (rev. D, cap. 8): antes se usaba la MENOR distancia de los
+dos sensores; el motor vibraba de 1 m a 1,5 m con intensidad proporcional y el
+buzzer pitaba por debajo de 1 m (intermitente) y de 50 cm (continuo).
+
+Cambios en el código:
+  - config.h:  DIST_CERCA_CM → DIST_CONTINUO_BAJO_CM (50). Nuevos
+               DIST_AVISO_ALTO_CM (120) y DIST_CONTINUO_ALTO_CM (80), fijos
+               (no se ajustan desde la app). Se quitaron DIST_MEDIO_CM y
+               PWM_MOTOR_MIN. Nuevos: PULSO_AVISO_MS (100),
+               PERIODO_AVISO_LEJOS_MS (1000), PERIODO_AVISO_CERCA_MS (200).
+  - avisos:    se quitaron PATRON_OBSTACULO_MEDIO y PATRON_OBSTACULO_CERCA y
+               vibrarObstaculo(pwm). Nuevos obstaculoBuzzer(periodo) y
+               obstaculoMotor(periodo) (0 = nada, AVISO_CONTINUO = continuo).
+               Prioridad del buzzer: el obstáculo alto va donde estaban los
+               dos patrones de obstáculo (debajo del sonar, arriba de batería).
+  - Columnas del CSV de depuración: ms,bajo_cm,alto_cm,motor_ms,buzzer_ms
+    (0 = nada, 1 = continuo, otro = periodo en ms).
+
+Para actualizar en la documentación:
+  - Cap. 8 (tabla de patrones de aviso) y el gráfico de tramos.
+  - CU01 paso 4 (ya no se toma la menor distancia) y CU02 completo.
+  - CU01 1a: si un sensor no responde, el otro YA NO cubre su aviso (avisan
+    con actuadores distintos). Decidir si se agrega un aviso de falla.
+  - HU01 / HU02 y pruebas P2, P4 (criterios de aceptación).
+  - CU12: "dist_bajo_cm" sigue siendo solo el límite del sensor bajo. Los
+    120/80 cm del sensor alto son fijos; si se quieren ajustar desde la app
+    habría que volver a agregar un ajuste propio (ver punto 6).
